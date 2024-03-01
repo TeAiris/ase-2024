@@ -69,66 +69,19 @@ impl<T: Copy + Default> RingBuffer<T> {
         }
     }
 
-    pub fn set_capacity(&mut self, new_capacity: usize) {
-        // Resize the buffer if the new capacity is different from the current capacity
-        if new_capacity != self.buffer.len() {
-            self.buffer.resize(new_capacity, T::default());
-        }
-    }
     pub fn capacity(&self) -> usize {
         // Return the size of the internal buffer.
         self.buffer.len()
     }
 }
 
-// impl RingBuffer<f32> {
-//     // Return the value at at an offset from the current read index.
-//     // To handle fractional offsets, linearly interpolate between adjacent values. 
-//     pub fn get_frac(&self, offset: f32) -> f32 {
-        
-//         let read_index = self.get_read_index() as f32;
-//         let index = read_index + offset;
-//         let index_floor = index.floor() as usize;
-//         let index_ceil = index.ceil() as usize;
-//         let fraction = index - index.floor();
-
-//         let value_floor = self.get(index_floor);
-//         let value_ceil = self.get(index_ceil);
-
-//         value_floor * (1.0 - fraction) + value_ceil * fraction
-
-//         // use modulo to make sure it doesn't wrap
-//         // use modulo ahead of time. 
-
-
-
-
-
-//     }
-// }
-
 impl RingBuffer<f32> {
-    // Return the value at an offset from the current read index.
-    // To handle fractional offsets, linearly interpolate between adjacent values.
+    // Return the value at at an offset from the current read index.
+    // To handle fractional offsets, linearly interpolate between adjacent values. 
     pub fn get_frac(&self, offset: f32) -> f32 {
-        let buffer_size = self.len() as f32; // Assuming len() gives the size of the buffer.
-        let read_index = self.get_read_index() as f32;
-        let index = (read_index + offset).rem_euclid(buffer_size);
-        let index_floor = index.floor() as usize; // Changed to floor for the lower bound.
-        let index_ceil = (index_floor + 1) % self.len(); // Wraps around using modulo for the upper bound.
-        let fraction = index - index.floor(); // Calculate the fractional part.
-
-        let value_floor = self.get(index_floor);
-        let value_ceil = self.get(index_ceil);
-
-        // Linear interpolation between adjacent values.
-        value_floor * (1.0 - fraction) + value_ceil * fraction
+        todo!("implement")
     }
-
-           // use modulo to make sure it wraps
-        // use modulo ahead of time. 
 }
-
 
 #[cfg(test)]
 mod tests {
