@@ -89,6 +89,7 @@ mod tests {
     use super::*;
 
     #[test]
+    /// Verifies `Vibrato`'s `process` method with a predefined input signal.
     fn test_vibrato_process() {
         let input_signal = vec![0.0, 0.25, 0.5, 0.75, 1.0];
         let samplerate = 44100.0;
@@ -98,11 +99,10 @@ mod tests {
         let mut vibrato = Vibrato::new(samplerate, mod_freq, mod_depth, delay_time_sec);
         let output_signal = vibrato.process(&input_signal);
         assert_eq!(output_signal.len(), input_signal.len());
-
-    
     }
 
     #[test]
+    /// Ensures `Vibrato`'s `process` method handles an empty input signal correctly.
     fn test_vibrato_process_with_no_input() {
         let samplerate = 44100.0;
         let mod_freq = 5.0;
@@ -115,6 +115,7 @@ mod tests {
     }
 
     #[test]
+    /// Checks `Vibrato`'s `process` method with a single input sample.
     fn test_vibrato_process_with_single_input() {
         let samplerate = 44100.0;
         let mod_freq = 10.0;
@@ -128,6 +129,7 @@ mod tests {
     }
 
     #[test]
+    /// Validates `Vibrato`'s `process` method with multiple input samples.
     fn test_vibrato_process_with_multiple_inputs() {
         let samplerate = 22050.0;
         let mod_freq = 2.5;
@@ -141,5 +143,4 @@ mod tests {
             assert_eq!(output[i], input[i]);
         }
     }
-
 }
