@@ -2,6 +2,7 @@ pub struct CombFilter {
     filter_type: FilterType,
     max_delay_samples: usize,
     delay_line: Vec<Vec<f32>>,
+    delay_line_pos: Vec<usize>,
     gain: f32,
     sample_rate_hz: f32,
 }
@@ -27,11 +28,13 @@ impl CombFilter {
     pub fn new(filter_type: FilterType, max_delay_secs: f32, sample_rate_hz: f32, num_channels: usize) -> Self {
         let max_delay_samples = (max_delay_secs * sample_rate_hz) as usize;
         let delay_line = vec![vec![0.0; max_delay_samples]; num_channels];
+        let delay_line_pos = vec![0; num_channels];
         let gain = 1.0;
         CombFilter {
             filter_type,
             max_delay_samples,
             delay_line,
+            delay_line_pos,
             gain,
             sample_rate_hz,
         }
@@ -43,19 +46,40 @@ impl CombFilter {
                 *sample = 0.0;
             }
         }
+        for pos in self.delay_line_pos.iter_mut() {
+            *pos = 0;
+        }
+    }
+
+    pub fn process_fir(&mut self, input: &[&[f32]], output: &mut [&mut [f32]]) {
+        for (channel_idx, (input_channel, output_channel)) in input.iter().zip(output.iter_mut()).enumerate() {
+            for (input_sample, output_sample) in input_channel.iter().zip(output_channel.iter_mut()) {
+                let delayed_sample = self.delay_line[channel_idx][self.delay_line_pos[channel_idx]];
+                *output_sample = *input_sample + self.gain * delayed_sample;
+                self.delay_line[channel_idx][self.delay_line_pos[channel_idx]] = *input_sample;
+                self.delay_line_pos[channel_idx] = (self.delay_line_pos[channel_idx] + 1) % self.max_delay_samples;
+            }
+        }
+    }
+
+    pub fn process_iir(&mut self, input: &[&[f32]], output: &mut [&mut [f32]]) {
+        for (channel_idx, (input_channel, output_channel)) in input.iter().zip(output.iter_mut()).enumerate() {
+            for (input_sample, output_sample) in input_channel.iter().zip(output_channel.iter_mut()) {
+                let delayed_sample = self.delay_line[channel_idx][self.delay_line_pos[channel_idx]];
+                *output_sample = *input_sample + self.gain * delayed_sample;
+                self.delay_line[channel_idx][self.delay_line_pos[channel_idx]] = *output_sample;
+                self.delay_line_pos[channel_idx] = (self.delay_line_pos[channel_idx] + 1) % self.max_delay_samples;
+            }
+        }
     }
 
     pub fn process(&mut self, input: &[&[f32]], output: &mut [&mut [f32]]) {
-        for (channel_idx, (input_channel, output_channel)) in input.iter().zip(output.iter_mut()).enumerate() {
-            for (input_sample, output_sample) in input_channel.iter().zip(output_channel.iter_mut()) {
-                let delayed_sample = self.delay_line[channel_idx][0];
-                *output_sample = delayed_sample;
-                // Shift samples in delay line
-                for i in (1..self.max_delay_samples).rev() {
-                    self.delay_line[channel_idx][i] = self.delay_line[channel_idx][i - 1];
-                }
-                // Update delayed sample
-                self.delay_line[channel_idx][0] = *input_sample + self.gain * delayed_sample;
+        match self.filter_type {
+            FilterType::FIR => {
+                self.process_fir(input, output);
+            }
+            FilterType::IIR => {
+                self.process_iir(input, output);
             }
         }
     }
@@ -139,13 +163,4 @@ impl CombFilter {
         }
     }
 }
-
-
-// TODO: feel free to define other types (here or in other modules) for your own use
-
-// possible test, test the half period of a sine way. It should be 0 
-
-//possible test, feed nothing in , the output should be 0 
-
-// (a-b).abs()< epsilion    .00001
 
