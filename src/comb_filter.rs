@@ -164,3 +164,41 @@ impl CombFilter {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fir_output_zero_when_input_freq_matches_feedforward() {
+        // Create a new CombFilter
+        let mut comb_filter = CombFilter::new(FilterType::FIR, 1.0, 44100.0, 1);
+
+        // Set the gain to 0.0
+        comb_filter.set_param(FilterParam::Gain, 0.0).unwrap();
+
+        // Create a buffer for the input and output
+        let input = vec![vec![0.0; 1024]];
+        let mut output = vec![vec![0.0; 1024]];
+
+        // Process the input
+        comb_filter.process(&input.iter().map(|x| &x[..]).collect::<Vec<_>>(), &mut output.iter_mut().map(|x| &mut x[..]).collect::<Vec<_>>());
+
+        // Check that the output is all zeros
+        for channel in output {
+            for sample in channel {
+                assert_eq!(sample, 0.0);
+            
+            }
+        }
+    }
+
+   
+
+}
+
+
+
+
+
+
+

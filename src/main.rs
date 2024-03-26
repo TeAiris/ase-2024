@@ -6,8 +6,8 @@
 
 mod comb_filter;
 
-use std::{fs::File, io::Write};
-use hound::{WavReader, WavWriter, SampleFormat};
+
+use hound::{WavReader, WavWriter};
 use comb_filter::{CombFilter, FilterType, FilterParam};
 
 fn show_info() {
@@ -55,4 +55,5 @@ fn main() {
 
     writer.finalize().unwrap();
 }
+
 
