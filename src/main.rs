@@ -1,4 +1,5 @@
 use std::{fs::File, io::{Write, BufWriter}};
+use hound::{WavReader,WavWriter, WavSpec};
 
 mod ring_buffer;
 mod vibrato;
@@ -9,18 +10,22 @@ fn show_info() {
     eprintln!("(c) 2024 Stephen Garrett & Ian Clester");
 }
 
+fn print_usage() {
+    eprintln!("Usage: ./executable <input wave filename> <output wave filename> <modulation frequency> <modulation depth> <delay time>");
+}
+
 fn main() {
     show_info();
 
     // Parse command line arguments
     let args: Vec<String> = std::env::args().collect();
-    if args.len() < 3 {
-        eprintln!("Usage: {} <input wave filename> <output text filename>", args[0]);
+    if args.len() != 6 {
+        print_usage();
         return;
     }
 
     // Open the input wave file
-    let mut reader = match hound::WavReader::open(&args[1]) {
+    let mut reader = match WavReader::open(&args[1]) {
         Ok(reader) => reader,
         Err(err) => {
             eprintln!("Error opening input file: {}", err);
@@ -28,9 +33,9 @@ fn main() {
         }
     };
     let spec = reader.spec();
-    let num_channels = spec.channels as usize; // Added to fix compilation issue
+    let num_channels = spec.channels as usize;
 
-    // Open the output text file
+    // Open the output WAV file
     let out_file = match File::create(&args[2]) {
         Ok(file) => file,
         Err(err) => {
@@ -38,59 +43,81 @@ fn main() {
             return;
         }
     };
-    let mut out_text = BufWriter::new(out_file);
 
-    // Write processing status message at the top of the output text file
-    //This was used as I was debugging to figure out why it wouldn't write the text out. It is fixed now. 
-    // let processing_status = if let Some(file_name) = args.get(1) {
-    //     format!("Processing audio file: {}\n", file_name)
-    // } else {
-    //     "Processing audio file\n".to_string()
-    // };
-    // if let Err(err) = out_text.write_all(processing_status.as_bytes()) {
-    //     eprintln!("Error writing processing status: {}", err);
-    //     return;
-    // }
+    // Prepare WAV file specifications
+    let wav_spec = WavSpec {
+        channels: num_channels as u16,
+        sample_rate: spec.sample_rate,
+        bits_per_sample: spec.bits_per_sample as u16,
+        sample_format: hound::SampleFormat::Int,
+    };
 
-    // Set up vibrato parameters
-    let samplerate = spec.sample_rate as f32;
-    let mod_freq = 5.0; // Adjust modulation frequency as needed
-    let mod_depth = 0.1; // Adjust modulation depth as needed
-    let delay_time_sec = 0.1; // Adjust delay time as needed
-    let mut vibrato = vibrato::Vibrato::new(samplerate, mod_freq, mod_depth, delay_time_sec);
-
-    
-
-// Read audio data, process with vibrato, and write to the output text file
-let mut samples = Vec::new(); // Accumulate samples to pass to vibrato.process()
-for sample in reader.samples::<i32>() {
-    let sample = match sample {
-        Ok(sample) => sample as f32 / (1 << 31) as f32, // Convert sample to f32 with normalization
+    // Create a WavWriter with the specified specifications
+    let mut wav_writer = match WavWriter::new(out_file, wav_spec) {
+        Ok(writer) => writer,
         Err(err) => {
-            eprintln!("Error reading sample: {}", err);
+            eprintln!("Error creating WAV writer: {}", err);
             return;
         }
     };
-    samples.push(sample);
-    if samples.len() == num_channels {
-        let processed_samples = vibrato.process(&samples); // Apply vibrato processing
-        for processed_sample in processed_samples {
-            if let Err(err) = write!(out_text, "{:.6} ", processed_sample) {
-                eprintln!("Error writing sample to file: {}", err);
+
+    // Set up vibrato parameters from command-line arguments
+    let samplerate = spec.sample_rate as f32;
+    let mod_freq = match args[3].parse::<f32>() {
+        Ok(val) => val,
+        Err(_) => {
+            eprintln!("Error parsing modulation frequency");
+            return;
+        }
+    };
+    let mod_depth = match args[4].parse::<f32>() {
+        Ok(val) => val,
+        Err(_) => {
+            eprintln!("Error parsing modulation depth");
+            return;
+        }
+    };
+    let delay_time_sec = match args[5].parse::<f32>() {
+        Ok(val) => val,
+        Err(_) => {
+            eprintln!("Error parsing delay time");
+            return;
+        }
+    };
+    let mut vibrato = vibrato::Vibrato::new(samplerate, mod_freq, mod_depth, delay_time_sec);
+
+    // Process audio data and write to the output WAV file
+    let mut samples = Vec::new();
+    for sample in reader.samples::<i32>() {
+        let sample = match sample {
+            Ok(sample) => sample as f32 / (1 << 31) as f32,
+            Err(err) => {
+                eprintln!("Error reading sample: {}", err);
                 return;
             }
+        };
+        samples.push(sample);
+        if samples.len() == num_channels {
+            let processed_samples = vibrato.process(&samples);
+            for processed_sample in processed_samples {
+                // Convert processed sample back to i32 before writing to the WAV file
+                let processed_sample_i32 = (processed_sample * (1 << 31) as f32) as i32;
+                if let Err(err) = wav_writer.write_sample(processed_sample_i32) {
+                    eprintln!("Error writing sample to file: {}", err);
+                    return;
+                }
+            }
+            samples.clear();
         }
-        if let Err(err) = out_text.write_all(b"\n") {
-            eprintln!("Error writing newline to file: {}", err);
-            return;
-        }
-        if let Err(err) = out_text.flush() {
-            eprintln!("Error flushing output buffer: {}", err);
-            return;
-        }
-        samples.clear();
     }
-             }
+
+    // Finish writing to the WAV file
+    if let Err(err) = wav_writer.finalize() {
+        eprintln!("Error finalizing WAV file: {}", err);
+        return;
+    }
+
+    eprintln!("Processing completed successfully!");
 }
 
 
